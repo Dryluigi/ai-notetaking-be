@@ -1,0 +1,17 @@
+# docker-compose.yml
+version: '3.8'
+services:
+  db:
+    image: ankane/pgvector
+    restart: always
+    ports:
+      - "5435:5432"
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: ai-notetaking
+    volumes:
+      - pgvector_data:/var/lib/postgresql/data
+
+volumes:
+  pgvector_data:
