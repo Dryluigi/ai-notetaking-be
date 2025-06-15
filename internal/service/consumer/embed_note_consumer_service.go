@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgxpool"
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
@@ -34,6 +35,7 @@ type embedNoteConsumerService struct {
 	q  amqp.Queue
 
 	embeddingRepository embeddingrepository.IEmbeddingRepository
+	db                  *pgxpool.Pool
 }
 
 func (mq *embedNoteConsumerService) Consume(ctx context.Context) error {
@@ -52,6 +54,14 @@ func (mq *embedNoteConsumerService) Consume(ctx context.Context) error {
 	}
 
 	for msg := range msgs {
+		defer func() {
+			if err != nil {
+				nackErr := msg.Nack(false, false)
+				if nackErr != nil {
+					panic(nackErr)
+				}
+			}
+		}()
 		var dest noteservice.EmbedCreatedNoteMessage
 		err = json.Unmarshal(msg.Body, &dest)
 		if err != nil {
@@ -76,6 +86,19 @@ func (mq *embedNoteConsumerService) Consume(ctx context.Context) error {
 			return err
 		}
 
+		tx, err := mq.db.Begin(ctx)
+		if err != nil {
+			return err
+		}
+		defer func() {
+			if err != nil {
+				rollbackErr := tx.Rollback(ctx)
+				if rollbackErr != nil {
+					panic(rollbackErr)
+				}
+			}
+		}()
+		embedRepo := mq.embeddingRepository.UsingTx(ctx, tx)
 		embeddingText := embeddingentity.NoteEmbedding{
 			Id:           uuid.New(),
 			NoteId:       dest.NoteId,
@@ -84,11 +107,27 @@ func (mq *embedNoteConsumerService) Consume(ctx context.Context) error {
 			CreatedAt:    time.Now(),
 			CreatedBy:    "System",
 		}
-		err = mq.embeddingRepository.CreateNoteEmbedding(ctx, &embeddingText)
+		err = embedRepo.CreateNoteEmbedding(ctx, &embeddingText)
+		if err != nil {
+			return err
+		}
+		embeddingTitle := embeddingentity.NoteEmbedding{
+			Id:           uuid.New(),
+			NoteId:       dest.NoteId,
+			OriginalText: dest.Title,
+			Embedding:    embeddingResponse.Embedding,
+			CreatedAt:    time.Now(),
+			CreatedBy:    "System",
+		}
+		err = embedRepo.CreateNoteEmbedding(ctx, &embeddingTitle)
 		if err != nil {
 			return err
 		}
 
+		err = tx.Commit(ctx)
+		if err != nil {
+			return err
+		}
 		err = msg.Ack(false)
 		if err != nil {
 			return err
@@ -98,7 +137,12 @@ func (mq *embedNoteConsumerService) Consume(ctx context.Context) error {
 	return nil
 }
 
-func NewEmbedNoteConsumerService(connectionString string, queueName string, embeddingRepository embeddingrepository.IEmbeddingRepository) IEmbedNoteConsumerService {
+func NewEmbedNoteConsumerService(
+	connectionString string,
+	queueName string,
+	db *pgxpool.Pool,
+	embeddingRepository embeddingrepository.IEmbeddingRepository,
+) IEmbedNoteConsumerService {
 	conn, err := amqp.Dial(connectionString)
 	if err != nil {
 		panic(fmt.Sprintf("RabbitMQ connection error, %s", err))
@@ -124,6 +168,7 @@ func NewEmbedNoteConsumerService(connectionString string, queueName string, embe
 	return &embedNoteConsumerService{
 		ch:                  ch,
 		q:                   q,
+		db:                  db,
 		embeddingRepository: embeddingRepository,
 	}
 }

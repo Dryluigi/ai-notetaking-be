@@ -20,6 +20,7 @@ func main() {
 	consumer := consumerservice.NewEmbedNoteConsumerService(
 		os.Getenv("RABBITMQ_CONNECTION_STRING"),
 		"embed-note-content",
+		db,
 		embeddingRepository,
 	)
 	err := consumer.Consume(ctx)

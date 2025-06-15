@@ -2,6 +2,7 @@ package embedding
 
 import (
 	embeddingentity "ai-notetaking-be/internal/entity/embedding"
+	"ai-notetaking-be/pkg/database"
 	"context"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -9,11 +10,18 @@ import (
 )
 
 type IEmbeddingRepository interface {
+	UsingTx(ctx context.Context, tx database.DatabaseQueryer) IEmbeddingRepository
 	CreateNoteEmbedding(ctx context.Context, noteEmbedding *embeddingentity.NoteEmbedding) error
 }
 
 type embeddingRepository struct {
-	db *pgxpool.Pool
+	db database.DatabaseQueryer
+}
+
+func (n *embeddingRepository) UsingTx(ctx context.Context, tx database.DatabaseQueryer) IEmbeddingRepository {
+	return &embeddingRepository{
+		db: tx,
+	}
 }
 
 func (n *embeddingRepository) CreateNoteEmbedding(ctx context.Context, noteEmbedding *embeddingentity.NoteEmbedding) error {
