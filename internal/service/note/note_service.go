@@ -3,7 +3,7 @@ package note
 import (
 	noteentity "ai-notetaking-be/internal/entity/note"
 	noterepository "ai-notetaking-be/internal/repository/note"
-	rabbitqservice "ai-notetaking-be/internal/service/rabbitmq"
+	publisherservice "ai-notetaking-be/internal/service/publisher"
 	"context"
 	"encoding/json"
 	"time"
@@ -17,7 +17,7 @@ type INoteService interface {
 
 type noteService struct {
 	noteRepository  noterepository.INoteRepository
-	rabbitMqService rabbitqservice.IRabbitMqService
+	rabbitMqService publisherservice.IRabbitMqPublisherService
 }
 
 func (ns *noteService) Create(ctx context.Context, request *CreateNoteRequest) (*CreateNoteResponse, error) {
@@ -51,7 +51,7 @@ func (ns *noteService) Create(ctx context.Context, request *CreateNoteRequest) (
 	return &CreateNoteResponse{Id: id}, nil
 }
 
-func NewNoteService(noteRepository noterepository.INoteRepository, rabbitMqService rabbitqservice.IRabbitMqService) INoteService {
+func NewNoteService(noteRepository noterepository.INoteRepository, rabbitMqService publisherservice.IRabbitMqPublisherService) INoteService {
 	return &noteService{
 		noteRepository:  noteRepository,
 		rabbitMqService: rabbitMqService,

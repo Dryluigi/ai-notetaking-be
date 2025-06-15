@@ -4,6 +4,8 @@ go 1.23.2
 
 require github.com/jackc/pgx/v5 v5.7.5
 
+require github.com/pgvector/pgvector-go v0.3.0 // indirect
+
 require (
 	github.com/andybalholm/brotli v1.1.0 // indirect
 	github.com/gofiber/fiber/v2 v2.52.8 // indirect

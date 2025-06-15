@@ -1,4 +1,4 @@
-package rabbitmq
+package publisher
 
 import (
 	"context"
@@ -7,16 +7,16 @@ import (
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
-type IRabbitMqService interface {
+type IRabbitMqPublisherService interface {
 	Publish(ctx context.Context, payload []byte) error
 }
 
-type rabbitMqService struct {
+type rabbitMqPublisherService struct {
 	ch *amqp.Channel
 	q  amqp.Queue
 }
 
-func (mq *rabbitMqService) Publish(ctx context.Context, payload []byte) error {
+func (mq *rabbitMqPublisherService) Publish(ctx context.Context, payload []byte) error {
 	err := mq.ch.PublishWithContext(
 		ctx,
 		"",
@@ -35,7 +35,7 @@ func (mq *rabbitMqService) Publish(ctx context.Context, payload []byte) error {
 	return nil
 }
 
-func NewRabbitMqService(connectionString string, queueName string) IRabbitMqService {
+func NewRabbitMqPublisherService(connectionString string, queueName string) IRabbitMqPublisherService {
 	conn, err := amqp.Dial(connectionString)
 	if err != nil {
 		panic(fmt.Sprintf("RabbitMQ connection error, %s", err))
@@ -58,7 +58,7 @@ func NewRabbitMqService(connectionString string, queueName string) IRabbitMqServ
 		panic(fmt.Sprintf("RabbitMQ declaring queue error, %s", err))
 	}
 
-	return &rabbitMqService{
+	return &rabbitMqPublisherService{
 		ch: ch,
 		q:  q,
 	}

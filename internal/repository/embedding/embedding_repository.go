@@ -1,0 +1,41 @@
+package embedding
+
+import (
+	embeddingentity "ai-notetaking-be/internal/entity/embedding"
+	"context"
+
+	"github.com/jackc/pgx/v5/pgxpool"
+	pgvector "github.com/pgvector/pgvector-go"
+)
+
+type IEmbeddingRepository interface {
+	CreateNoteEmbedding(ctx context.Context, noteEmbedding *embeddingentity.NoteEmbedding) error
+}
+
+type embeddingRepository struct {
+	db *pgxpool.Pool
+}
+
+func (n *embeddingRepository) CreateNoteEmbedding(ctx context.Context, noteEmbedding *embeddingentity.NoteEmbedding) error {
+	_, err := n.db.Exec(
+		ctx,
+		"INSERT INTO embedding_notes (id, original_text, embedding, note_id, created_at, created_by) VALUES ($1, $2, $3, $4, $5, $6)",
+		noteEmbedding.Id,
+		noteEmbedding.OriginalText,
+		pgvector.NewVector(noteEmbedding.Embedding),
+		noteEmbedding.NoteId,
+		noteEmbedding.CreatedAt,
+		noteEmbedding.CreatedBy,
+	)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func NewEmbeddingRepository(db *pgxpool.Pool) IEmbeddingRepository {
+	return &embeddingRepository{
+		db: db,
+	}
+}
