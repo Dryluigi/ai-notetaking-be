@@ -31,8 +31,14 @@ type IEmbedNoteConsumerService interface {
 }
 
 type embedNoteConsumerService struct {
+	embeddingServerBaseUrl string
+	embeddingModelName     string
+
 	ch *amqp.Channel
 	q  amqp.Queue
+
+	semaphore     chan struct{}
+	maxConcurrent int
 
 	embeddingRepository embeddingrepository.IEmbeddingRepository
 	db                  *pgxpool.Pool
@@ -54,84 +60,96 @@ func (mq *embedNoteConsumerService) Consume(ctx context.Context) error {
 	}
 
 	for msg := range msgs {
-		defer func() {
-			if err != nil {
-				nackErr := msg.Nack(false, false)
-				if nackErr != nil {
-					panic(nackErr)
-				}
+		mq.semaphore <- struct{}{}
+
+		go mq.processMessage(ctx, msg)
+	}
+
+	return nil
+}
+
+func (mq *embedNoteConsumerService) processMessage(ctx context.Context, msg amqp.Delivery) error {
+	defer func() {
+		<-mq.semaphore
+	}()
+	var err error
+	defer func() {
+		if err != nil {
+			nackErr := msg.Nack(false, false)
+			if nackErr != nil {
+				panic(nackErr)
 			}
-		}()
-		var dest noteservice.EmbedCreatedNoteMessage
-		err = json.Unmarshal(msg.Body, &dest)
-		if err != nil {
-			return err
 		}
+	}()
+	var dest noteservice.EmbedCreatedNoteMessage
+	err = json.Unmarshal(msg.Body, &dest)
+	if err != nil {
+		return err
+	}
 
-		req := EmbeddingModelRequest{
-			Model:  "nomic-embed-text",
-			Prompt: dest.Content,
-		}
-		reqJson, _ := json.Marshal(req)
-		res, err := http.Post("http://localhost:11434/api/embeddings", "application/json", bytes.NewBuffer(reqJson))
-		if err != nil {
-			log.Println(err)
-			return err
-		}
+	req := EmbeddingModelRequest{
+		Model:  mq.embeddingModelName,
+		Prompt: dest.Content,
+	}
+	reqJson, _ := json.Marshal(req)
+	res, err := http.Post(fmt.Sprintf("%s/api/embeddings", mq.embeddingServerBaseUrl), "application/json", bytes.NewBuffer(reqJson))
+	if err != nil {
+		log.Println(err)
+		return err
+	}
 
-		var embeddingResponse EmbeddingModelResponse
-		err = json.NewDecoder(res.Body).Decode(&embeddingResponse)
-		if err != nil {
-			log.Println(err)
-			return err
-		}
+	var embeddingResponse EmbeddingModelResponse
+	err = json.NewDecoder(res.Body).Decode(&embeddingResponse)
+	if err != nil {
+		log.Println(err)
+		return err
+	}
 
-		tx, err := mq.db.Begin(ctx)
+	tx, err := mq.db.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer func() {
 		if err != nil {
-			return err
-		}
-		defer func() {
-			if err != nil {
-				rollbackErr := tx.Rollback(ctx)
-				if rollbackErr != nil {
-					panic(rollbackErr)
-				}
+			rollbackErr := tx.Rollback(ctx)
+			if rollbackErr != nil {
+				panic(rollbackErr)
 			}
-		}()
-		embedRepo := mq.embeddingRepository.UsingTx(ctx, tx)
-		embeddingText := embeddingentity.NoteEmbedding{
-			Id:           uuid.New(),
-			NoteId:       dest.NoteId,
-			OriginalText: dest.Content,
-			Embedding:    embeddingResponse.Embedding,
-			CreatedAt:    time.Now(),
-			CreatedBy:    "System",
 		}
-		err = embedRepo.CreateNoteEmbedding(ctx, &embeddingText)
-		if err != nil {
-			return err
-		}
-		embeddingTitle := embeddingentity.NoteEmbedding{
-			Id:           uuid.New(),
-			NoteId:       dest.NoteId,
-			OriginalText: dest.Title,
-			Embedding:    embeddingResponse.Embedding,
-			CreatedAt:    time.Now(),
-			CreatedBy:    "System",
-		}
-		err = embedRepo.CreateNoteEmbedding(ctx, &embeddingTitle)
-		if err != nil {
-			return err
-		}
+	}()
+	embedRepo := mq.embeddingRepository.UsingTx(ctx, tx)
+	embeddingText := embeddingentity.NoteEmbedding{
+		Id:           uuid.New(),
+		NoteId:       dest.NoteId,
+		OriginalText: dest.Content,
+		Embedding:    embeddingResponse.Embedding,
+		CreatedAt:    time.Now(),
+		CreatedBy:    "System",
+	}
+	err = embedRepo.CreateNoteEmbedding(ctx, &embeddingText)
+	if err != nil {
+		return err
+	}
+	embeddingTitle := embeddingentity.NoteEmbedding{
+		Id:           uuid.New(),
+		NoteId:       dest.NoteId,
+		OriginalText: dest.Title,
+		Embedding:    embeddingResponse.Embedding,
+		CreatedAt:    time.Now(),
+		CreatedBy:    "System",
+	}
+	err = embedRepo.CreateNoteEmbedding(ctx, &embeddingTitle)
+	if err != nil {
+		return err
+	}
 
-		err = tx.Commit(ctx)
-		if err != nil {
-			return err
-		}
-		err = msg.Ack(false)
-		if err != nil {
-			return err
-		}
+	err = tx.Commit(ctx)
+	if err != nil {
+		return err
+	}
+	err = msg.Ack(false)
+	if err != nil {
+		return err
 	}
 
 	return nil
@@ -141,6 +159,8 @@ func NewEmbedNoteConsumerService(
 	connectionString string,
 	queueName string,
 	db *pgxpool.Pool,
+	embeddingServerBaseUrl string,
+	embeddingModelName string,
 	embeddingRepository embeddingrepository.IEmbeddingRepository,
 ) IEmbedNoteConsumerService {
 	conn, err := amqp.Dial(connectionString)
@@ -166,9 +186,13 @@ func NewEmbedNoteConsumerService(
 	}
 
 	return &embedNoteConsumerService{
-		ch:                  ch,
-		q:                   q,
-		db:                  db,
-		embeddingRepository: embeddingRepository,
+		ch:                     ch,
+		q:                      q,
+		embeddingServerBaseUrl: embeddingServerBaseUrl,
+		embeddingModelName:     embeddingModelName,
+		db:                     db,
+		maxConcurrent:          100,
+		semaphore:              make(chan struct{}, 100),
+		embeddingRepository:    embeddingRepository,
 	}
 }

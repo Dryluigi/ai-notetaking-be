@@ -21,6 +21,8 @@ func main() {
 		os.Getenv("RABBITMQ_CONNECTION_STRING"),
 		"embed-note-content",
 		db,
+		os.Getenv("EMBEDDING_SERVER_BASE_URL"),
+		os.Getenv("EMBEDDING_MODEL_NAME"),
 		embeddingRepository,
 	)
 	err := consumer.Consume(ctx)
