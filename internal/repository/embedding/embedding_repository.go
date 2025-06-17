@@ -5,6 +5,7 @@ import (
 	"ai-notetaking-be/pkg/database"
 	"context"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 	pgvector "github.com/pgvector/pgvector-go"
 )
@@ -12,6 +13,7 @@ import (
 type IEmbeddingRepository interface {
 	UsingTx(ctx context.Context, tx database.DatabaseQueryer) IEmbeddingRepository
 	CreateNoteEmbedding(ctx context.Context, noteEmbedding *embeddingentity.NoteEmbedding) error
+	FindMostSimilarNoteIds(ctx context.Context, embeddingValue []float32) ([]uuid.UUID, error)
 }
 
 type embeddingRepository struct {
@@ -40,6 +42,34 @@ func (n *embeddingRepository) CreateNoteEmbedding(ctx context.Context, noteEmbed
 	}
 
 	return nil
+}
+
+func (n *embeddingRepository) FindMostSimilarNoteIds(ctx context.Context, embeddingValue []float32) ([]uuid.UUID, error) {
+	rows, err := n.db.Query(
+		ctx,
+		"SELECT note_id, embedding <-> $1 AS similarity FROM embedding_notes ORDER BY similarity LIMIT 10",
+		pgvector.NewVector(embeddingValue),
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	result := make([]uuid.UUID, 10)
+	i := 9
+	for rows.Next() {
+		var id uuid.UUID
+		var distance float32
+
+		err = rows.Scan(&id, &distance)
+		if err != nil {
+			return nil, err
+		}
+
+		result[i] = id
+		i--
+	}
+
+	return result, nil
 }
 
 func NewEmbeddingRepository(db *pgxpool.Pool) IEmbeddingRepository {

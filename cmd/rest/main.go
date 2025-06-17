@@ -2,6 +2,7 @@ package main
 
 import (
 	notecontroller "ai-notetaking-be/internal/controller/note"
+	embeddingrepository "ai-notetaking-be/internal/repository/embedding"
 	noterepository "ai-notetaking-be/internal/repository/note"
 	noteservice "ai-notetaking-be/internal/service/note"
 	publisherservice "ai-notetaking-be/internal/service/publisher"
@@ -19,8 +20,15 @@ func main() {
 
 	db := database.ConnectDB(os.Getenv("DB_CONNECTION_STRING"))
 	rabbitMqService := publisherservice.NewRabbitMqPublisherService(os.Getenv("RABBITMQ_CONNECTION_STRING"), "embed-note-content")
+	embeddingRepository := embeddingrepository.NewEmbeddingRepository(db)
 	noteRepository := noterepository.NewNoteRepository(db)
-	noteService := noteservice.NewNoteService(noteRepository, rabbitMqService)
+	noteService := noteservice.NewNoteService(
+		noteRepository,
+		embeddingRepository,
+		rabbitMqService,
+		os.Getenv("EMBEDDING_SERVER_BASE_URL"),
+		os.Getenv("EMBEDDING_MODEL_NAME"),
+	)
 	noteController := notecontroller.NewNoteController(noteService)
 
 	notecontroller.AssignNoteRoutes(app, noteController)

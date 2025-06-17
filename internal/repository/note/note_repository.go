@@ -3,15 +3,16 @@ package note
 import (
 	noteentity "ai-notetaking-be/internal/entity/note"
 	"context"
+	"fmt"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
-	pgvector "github.com/pgvector/pgvector-go"
 )
 
 type INoteRepository interface {
 	Create(ctx context.Context, noteEntity *noteentity.Note) error
-	UpdateNoteEmbeddingValue(ctx context.Context, noteId uuid.UUID, embeddingValue []float32) error
+	GetByIds(ctx context.Context, ids []uuid.UUID) ([]*noteentity.Note, error)
 }
 
 type noteRepository struct {
@@ -35,18 +36,42 @@ func (n *noteRepository) Create(ctx context.Context, noteEntity *noteentity.Note
 	return nil
 }
 
-func (n *noteRepository) UpdateNoteEmbeddingValue(ctx context.Context, noteId uuid.UUID, embeddingValue []float32) error {
-	_, err := n.db.Exec(
-		ctx,
-		"UPDATE notes SET embedding = $1 WHERE id = $2",
-		pgvector.NewVector(embeddingValue),
-		noteId,
-	)
-	if err != nil {
-		return err
+func (n *noteRepository) GetByIds(ctx context.Context, ids []uuid.UUID) ([]*noteentity.Note, error) {
+	if len(ids) == 0 {
+		return make([]*noteentity.Note, 0), nil
 	}
 
-	return nil
+	whereIds := make([]string, 0)
+	for _, id := range ids {
+		whereIds = append(whereIds, fmt.Sprintf("'%s'", id.String()))
+	}
+	whereQuery := strings.Join(whereIds, ", ")
+
+	rows, err := n.db.Query(
+		ctx,
+		fmt.Sprintf(
+			"SELECT id, title FROM notes WHERE id IN (%s)",
+			whereQuery,
+		),
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	var result []*noteentity.Note = make([]*noteentity.Note, 0)
+	for rows.Next() {
+		noteEntity := noteentity.Note{}
+		err = rows.Scan(
+			&noteEntity.Id,
+			&noteEntity.Title,
+		)
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, &noteEntity)
+	}
+
+	return result, nil
 }
 
 func NewNoteRepository(db *pgxpool.Pool) INoteRepository {
