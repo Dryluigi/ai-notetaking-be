@@ -20,6 +20,14 @@ type SearchNoteResponse struct {
 	Title string    `json:"title"`
 }
 
+type AskNoteRequest struct {
+	Question string `query:"question"`
+}
+
+type AskNoteResponse struct {
+	Answer string `json:"answer"`
+}
+
 type EmbedCreatedNoteMessage struct {
 	NoteId  uuid.UUID `json:"note_id"`
 	Title   string    `json:"title"`

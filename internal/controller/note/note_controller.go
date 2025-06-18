@@ -9,6 +9,7 @@ import (
 type INoteController interface {
 	Create(c *fiber.Ctx) error
 	Search(c *fiber.Ctx) error
+	Ask(c *fiber.Ctx) error
 }
 
 type noteController struct {
@@ -38,6 +39,21 @@ func (nc *noteController) Search(c *fiber.Ctx) error {
 	}
 
 	res, err := nc.noteService.Search(c.UserContext(), &request)
+	if err != nil {
+		return err
+	}
+
+	return c.Status(fiber.StatusOK).JSON(res)
+}
+
+func (nc *noteController) Ask(c *fiber.Ctx) error {
+	var request noteservice.AskNoteRequest
+	err := c.QueryParser(&request)
+	if err != nil {
+		return err
+	}
+
+	res, err := nc.noteService.Ask(c.UserContext(), &request)
 	if err != nil {
 		return err
 	}

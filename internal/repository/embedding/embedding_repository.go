@@ -47,7 +47,7 @@ func (n *embeddingRepository) CreateNoteEmbedding(ctx context.Context, noteEmbed
 func (n *embeddingRepository) FindMostSimilarNoteIds(ctx context.Context, embeddingValue []float32) ([]uuid.UUID, error) {
 	rows, err := n.db.Query(
 		ctx,
-		"SELECT note_id, embedding <-> $1 AS similarity FROM embedding_notes ORDER BY similarity LIMIT 10",
+		"SELECT note_id, original_text, embedding <-> $1 AS similarity FROM embedding_notes ORDER BY similarity LIMIT 10",
 		pgvector.NewVector(embeddingValue),
 	)
 	if err != nil {

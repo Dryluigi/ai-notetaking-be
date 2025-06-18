@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -25,9 +26,35 @@ type EmbeddingModelResponse struct {
 	Embedding []float32 `json:"embedding"`
 }
 
+type ChatMessage struct {
+	Role    string `json:"role"`
+	Content string `json:"content"`
+}
+
+type ChatRequest struct {
+	Model    string        `json:"model"`
+	Messages []ChatMessage `json:"messages"`
+	Stream   bool          `json:"stream"`
+}
+
+type ChatResponse struct {
+	Model              string      `json:"model"`
+	CreatedAt          string      `json:"created_at"`
+	Message            ChatMessage `json:"message"`
+	DoneReason         string      `json:"done_reason"`
+	Done               bool        `json:"done"`
+	TotalDuration      int64       `json:"total_duration"`
+	LoadDuration       int64       `json:"load_duration"`
+	PromptEvalCount    int         `json:"prompt_eval_count"`
+	PromptEvalDuration int64       `json:"prompt_eval_duration"`
+	EvalCount          int         `json:"eval_count"`
+	EvalDuration       int64       `json:"eval_duration"`
+}
+
 type INoteService interface {
 	Create(ctx context.Context, request *CreateNoteRequest) (*CreateNoteResponse, error)
 	Search(ctx context.Context, request *SearchNoteRequest) ([]*SearchNoteResponse, error)
+	Ask(ctx context.Context, request *AskNoteRequest) (*AskNoteResponse, error)
 }
 
 type noteService struct {
@@ -114,7 +141,88 @@ func (ns *noteService) Search(ctx context.Context, request *SearchNoteRequest) (
 	}
 
 	return response, nil
+}
 
+func (ns *noteService) Ask(ctx context.Context, request *AskNoteRequest) (*AskNoteResponse, error) {
+	req := EmbeddingModelRequest{
+		Model:  ns.embeddingModelName,
+		Prompt: request.Question,
+	}
+	reqJson, _ := json.Marshal(req)
+	res, err := http.Post(fmt.Sprintf("%s/api/embeddings", ns.embeddingServiceBaseUrl), "application/json", bytes.NewBuffer(reqJson))
+	if err != nil {
+		log.Println(err)
+		return nil, err
+	}
+
+	var embeddingResponse EmbeddingModelResponse
+	err = json.NewDecoder(res.Body).Decode(&embeddingResponse)
+	if err != nil {
+		log.Println(err)
+		return nil, err
+	}
+
+	ids, err := ns.embeddingRepository.FindMostSimilarNoteIds(
+		ctx,
+		embeddingResponse.Embedding,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	notes, err := ns.noteRepository.GetByIds(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
+
+	references := make([]string, 0)
+	for i := 0; i < len(notes); i++ {
+		references = append(references, fmt.Sprintf("Reference %d", i+1))
+		references = append(references, notes[i].Title)
+		references = append(references, notes[i].Content)
+	}
+	referencesString := strings.Join(references, "\n")
+
+	prompt := fmt.Sprintf(`
+		Given references and question below. Answer the question directly without asking again with question language
+
+		%s
+
+		Question:
+		%s
+	
+		Your answer: ...
+	`, referencesString, request.Question)
+
+	log.Println(prompt)
+
+	chatRequest := ChatRequest{
+		Model: "llama3.2",
+		Messages: []ChatMessage{
+			{
+				Role:    "user",
+				Content: prompt,
+			},
+		},
+		Stream: false,
+	}
+	chatRequestJson, _ := json.Marshal(&chatRequest)
+	res, err = http.Post("http://localhost:11434/api/chat", "application/json", bytes.NewBuffer(chatRequestJson))
+	if err != nil {
+		log.Println(err)
+		return nil, err
+	}
+
+	var answerResponse ChatResponse
+	err = json.NewDecoder(res.Body).Decode(&answerResponse)
+	if err != nil {
+		log.Println(err)
+		return nil, err
+	}
+
+	return &AskNoteResponse{
+		Answer: answerResponse.Message.Content,
+	}, nil
 }
 
 func NewNoteService(

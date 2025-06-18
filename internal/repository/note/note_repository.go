@@ -50,7 +50,7 @@ func (n *noteRepository) GetByIds(ctx context.Context, ids []uuid.UUID) ([]*note
 	rows, err := n.db.Query(
 		ctx,
 		fmt.Sprintf(
-			"SELECT id, title FROM notes WHERE id IN (%s)",
+			"SELECT id, title, content FROM notes WHERE id IN (%s)",
 			whereQuery,
 		),
 	)
@@ -64,6 +64,7 @@ func (n *noteRepository) GetByIds(ctx context.Context, ids []uuid.UUID) ([]*note
 		err = rows.Scan(
 			&noteEntity.Id,
 			&noteEntity.Title,
+			&noteEntity.Content,
 		)
 		if err != nil {
 			return nil, err
