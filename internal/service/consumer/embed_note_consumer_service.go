@@ -118,27 +118,16 @@ func (mq *embedNoteConsumerService) processMessage(ctx context.Context, msg amqp
 		}
 	}()
 	embedRepo := mq.embeddingRepository.UsingTx(ctx, tx)
+	document := fmt.Sprintf(`Title: %s\nContent: %s`, dest.Title, dest.Content)
 	embeddingText := embeddingentity.NoteEmbedding{
 		Id:           uuid.New(),
 		NoteId:       dest.NoteId,
-		OriginalText: dest.Content,
+		OriginalText: document,
 		Embedding:    embeddingResponse.Embedding,
 		CreatedAt:    time.Now(),
 		CreatedBy:    "System",
 	}
 	err = embedRepo.CreateNoteEmbedding(ctx, &embeddingText)
-	if err != nil {
-		return err
-	}
-	embeddingTitle := embeddingentity.NoteEmbedding{
-		Id:           uuid.New(),
-		NoteId:       dest.NoteId,
-		OriginalText: dest.Title,
-		Embedding:    embeddingResponse.Embedding,
-		CreatedAt:    time.Now(),
-		CreatedBy:    "System",
-	}
-	err = embedRepo.CreateNoteEmbedding(ctx, &embeddingTitle)
 	if err != nil {
 		return err
 	}
