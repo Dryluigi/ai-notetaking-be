@@ -3,6 +3,7 @@ package consumer
 import (
 	embeddingentity "ai-notetaking-be/internal/entity/embedding"
 	embeddingrepository "ai-notetaking-be/internal/repository/embedding"
+	noterepository "ai-notetaking-be/internal/repository/note"
 	noteservice "ai-notetaking-be/internal/service/note"
 	"bytes"
 	"context"
@@ -41,6 +42,7 @@ type embedNoteConsumerService struct {
 	maxConcurrent int
 
 	embeddingRepository embeddingrepository.IEmbeddingRepository
+	noterepository      noterepository.INoteRepository
 	db                  *pgxpool.Pool
 }
 
@@ -107,10 +109,12 @@ func (mq *embedNoteConsumerService) processMessage(ctx context.Context, msg amqp
 
 	tx, err := mq.db.Begin(ctx)
 	if err != nil {
+		log.Println(err)
 		return err
 	}
 	defer func() {
 		if err != nil {
+			log.Println(err)
 			rollbackErr := tx.Rollback(ctx)
 			if rollbackErr != nil {
 				panic(rollbackErr)
@@ -118,7 +122,23 @@ func (mq *embedNoteConsumerService) processMessage(ctx context.Context, msg amqp
 		}
 	}()
 	embedRepo := mq.embeddingRepository.UsingTx(ctx, tx)
-	document := fmt.Sprintf(`Title: %s\nContent: %s`, dest.Title, dest.Content)
+	noteRepo := mq.noterepository.UsingTx(ctx, tx)
+
+	note, err := noteRepo.GetById(ctx, dest.NoteId)
+	if err != nil {
+		return err
+	}
+	notebookName := "-"
+	if note.Notebook != nil {
+		notebookName = note.Notebook.Name
+	}
+	document := fmt.Sprintf(
+		`Notebook: %s\nTitle: %s\nContent: %s\nCreated at: %s`,
+		notebookName,
+		note.Title,
+		note.Content,
+		note.CreatedAt.Format(time.RFC3339),
+	)
 	embeddingText := embeddingentity.NoteEmbedding{
 		Id:           uuid.New(),
 		NoteId:       dest.NoteId,
@@ -129,15 +149,18 @@ func (mq *embedNoteConsumerService) processMessage(ctx context.Context, msg amqp
 	}
 	err = embedRepo.CreateNoteEmbedding(ctx, &embeddingText)
 	if err != nil {
+		log.Println(err)
 		return err
 	}
 
 	err = tx.Commit(ctx)
 	if err != nil {
+		log.Println(err)
 		return err
 	}
 	err = msg.Ack(false)
 	if err != nil {
+		log.Println(err)
 		return err
 	}
 
@@ -151,6 +174,7 @@ func NewEmbedNoteConsumerService(
 	embeddingServerBaseUrl string,
 	embeddingModelName string,
 	embeddingRepository embeddingrepository.IEmbeddingRepository,
+	noteRepository noterepository.INoteRepository,
 ) IEmbedNoteConsumerService {
 	conn, err := amqp.Dial(connectionString)
 	if err != nil {
@@ -183,5 +207,6 @@ func NewEmbedNoteConsumerService(
 		maxConcurrent:          100,
 		semaphore:              make(chan struct{}, 100),
 		embeddingRepository:    embeddingRepository,
+		noterepository:         noteRepository,
 	}
 }

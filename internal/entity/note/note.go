@@ -18,4 +18,6 @@ type Note struct {
 	DeletedAt  *time.Time
 	DeletedBy  *string
 	IsDeleted  bool
+
+	Notebook *Notebook
 }

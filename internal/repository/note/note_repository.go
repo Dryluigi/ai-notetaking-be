@@ -2,21 +2,32 @@ package note
 
 import (
 	noteentity "ai-notetaking-be/internal/entity/note"
+	"ai-notetaking-be/pkg/database"
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type INoteRepository interface {
+	UsingTx(ctx context.Context, tx database.DatabaseQueryer) INoteRepository
 	Create(ctx context.Context, noteEntity *noteentity.Note) error
+	GetById(ctx context.Context, id uuid.UUID) (*noteentity.Note, error)
 	GetByIds(ctx context.Context, ids []uuid.UUID) ([]*noteentity.Note, error)
 }
 
 type noteRepository struct {
-	db *pgxpool.Pool
+	db database.DatabaseQueryer
+}
+
+func (n *noteRepository) UsingTx(ctx context.Context, tx database.DatabaseQueryer) INoteRepository {
+	return &noteRepository{
+		db: tx,
+	}
 }
 
 func (n *noteRepository) Create(ctx context.Context, noteEntity *noteentity.Note) error {
@@ -35,6 +46,58 @@ func (n *noteRepository) Create(ctx context.Context, noteEntity *noteentity.Note
 	}
 
 	return nil
+}
+
+func (n *noteRepository) GetById(ctx context.Context, id uuid.UUID) (*noteentity.Note, error) {
+	row := n.db.QueryRow(
+		ctx,
+		`
+			SELECT
+				n.id,
+				n.title,
+				n.content,
+				n.notebook_id,
+				n.created_at,
+				n.created_by,
+				nb.id,
+				nb.name
+			FROM
+				notes n
+			LEFT JOIN notebook nb
+				ON nb.id = n.notebook_id
+			WHERE n.id = $1
+		`,
+		id,
+	)
+	noteEntity := noteentity.Note{}
+	var notebookId *uuid.UUID
+	var notebookName *string
+	err := row.Scan(
+		&noteEntity.Id,
+		&noteEntity.Title,
+		&noteEntity.Content,
+		&noteEntity.NotebookId,
+		&noteEntity.CreatedAt,
+		&noteEntity.CreatedBy,
+		&notebookId,
+		&notebookName,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
+
+		return nil, err
+	}
+
+	if notebookId != nil {
+		noteEntity.Notebook = &noteentity.Notebook{
+			Id:   *notebookId,
+			Name: *notebookName,
+		}
+	}
+
+	return &noteEntity, nil
 }
 
 func (n *noteRepository) GetByIds(ctx context.Context, ids []uuid.UUID) ([]*noteentity.Note, error) {
