@@ -69,11 +69,12 @@ type noteService struct {
 func (ns *noteService) Create(ctx context.Context, request *CreateNoteRequest) (*CreateNoteResponse, error) {
 	id := uuid.New()
 	noteEntity := noteentity.Note{
-		Id:        id,
-		Title:     request.Title,
-		Content:   request.Content,
-		CreatedAt: time.Now(),
-		CreatedBy: "System",
+		Id:         id,
+		Title:      request.Title,
+		Content:    request.Content,
+		NotebookId: request.NotebookId,
+		CreatedAt:  time.Now(),
+		CreatedBy:  "System",
 	}
 	err := ns.noteRepository.Create(ctx, &noteEntity)
 	if err != nil {

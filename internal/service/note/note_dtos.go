@@ -3,8 +3,9 @@ package note
 import "github.com/google/uuid"
 
 type CreateNoteRequest struct {
-	Title   string `json:"title"`
-	Content string `json:"content"`
+	Title      string     `json:"title"`
+	Content    string     `json:"content"`
+	NotebookId *uuid.UUID `json:"notebook_id"`
 }
 
 type CreateNoteResponse struct {

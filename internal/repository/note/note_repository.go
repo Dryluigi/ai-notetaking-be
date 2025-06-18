@@ -22,10 +22,11 @@ type noteRepository struct {
 func (n *noteRepository) Create(ctx context.Context, noteEntity *noteentity.Note) error {
 	_, err := n.db.Exec(
 		ctx,
-		"INSERT INTO notes (id, title, content, created_at, created_by) VALUES ($1, $2, $3, $4, $5)",
+		"INSERT INTO notes (id, title, content, notebook_id, created_at, created_by) VALUES ($1, $2, $3, $4, $5, $6)",
 		noteEntity.Id,
 		noteEntity.Title,
 		noteEntity.Content,
+		noteEntity.NotebookId,
 		noteEntity.CreatedAt,
 		noteEntity.CreatedBy,
 	)
