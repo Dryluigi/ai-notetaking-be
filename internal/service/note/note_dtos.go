@@ -39,5 +39,6 @@ type AskNoteResponse struct {
 }
 
 type EmbedCreatedNoteMessage struct {
-	NoteId uuid.UUID `json:"note_id"`
+	NoteId             uuid.UUID `json:"note_id"`
+	DeleteOldEmbedding bool      `json:"delete_old_embedding"`
 }

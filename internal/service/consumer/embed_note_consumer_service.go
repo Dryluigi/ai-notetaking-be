@@ -110,6 +110,13 @@ func (mq *embedNoteConsumerService) processMessage(ctx context.Context, msg amqp
 	if err != nil {
 		return err
 	}
+	if dest.DeleteOldEmbedding {
+		err = embedRepo.DeleteNoteEmbeddings(ctx, dest.NoteId, "System")
+		if err != nil {
+			return err
+		}
+	}
+
 	notebookName := "-"
 	if note.Notebook != nil {
 		notebookName = note.Notebook.Name

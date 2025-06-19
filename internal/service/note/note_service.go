@@ -241,7 +241,8 @@ func (ns *noteService) Update(ctx context.Context, id uuid.UUID, request *Update
 	}
 
 	msg := EmbedCreatedNoteMessage{
-		NoteId: id,
+		NoteId:             id,
+		DeleteOldEmbedding: true,
 	}
 	msgJson, err := json.Marshal(msg)
 	if err != nil {

@@ -67,6 +67,7 @@ func (n *noteRepository) GetById(ctx context.Context, id uuid.UUID) (*noteentity
 			LEFT JOIN notebook nb
 				ON nb.id = n.notebook_id
 			WHERE n.id = $1
+				AND n.is_deleted = false
 		`,
 		id,
 	)
@@ -115,7 +116,7 @@ func (n *noteRepository) GetByIds(ctx context.Context, ids []uuid.UUID) ([]*note
 	rows, err := n.db.Query(
 		ctx,
 		fmt.Sprintf(
-			"SELECT id, title, content FROM notes WHERE id IN (%s)",
+			"SELECT id, title, content FROM notes WHERE id IN (%s) AND is_deleted = false",
 			whereQuery,
 		),
 	)

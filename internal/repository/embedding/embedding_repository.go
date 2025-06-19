@@ -4,6 +4,7 @@ import (
 	embeddingentity "ai-notetaking-be/internal/entity/embedding"
 	"ai-notetaking-be/pkg/database"
 	"context"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -14,6 +15,7 @@ type IEmbeddingRepository interface {
 	UsingTx(ctx context.Context, tx database.DatabaseQueryer) IEmbeddingRepository
 	CreateNoteEmbedding(ctx context.Context, noteEmbedding *embeddingentity.NoteEmbedding) error
 	FindMostSimilarNoteIds(ctx context.Context, embeddingValue []float32) ([]uuid.UUID, error)
+	DeleteNoteEmbeddings(ctx context.Context, noteId uuid.UUID, deletedBy string) error
 }
 
 type embeddingRepository struct {
@@ -44,10 +46,25 @@ func (n *embeddingRepository) CreateNoteEmbedding(ctx context.Context, noteEmbed
 	return nil
 }
 
+func (n *embeddingRepository) DeleteNoteEmbeddings(ctx context.Context, noteId uuid.UUID, deletedBy string) error {
+	_, err := n.db.Exec(
+		ctx,
+		"UPDATE embedding_notes SET is_deleted = true, deleted_at = $1, deleted_by = $2 WHERE note_id = $3",
+		time.Now(),
+		deletedBy,
+		noteId,
+	)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (n *embeddingRepository) FindMostSimilarNoteIds(ctx context.Context, embeddingValue []float32) ([]uuid.UUID, error) {
 	rows, err := n.db.Query(
 		ctx,
-		"SELECT note_id, original_text, embedding <-> $1 AS similarity FROM embedding_notes ORDER BY similarity LIMIT 10",
+		"SELECT note_id, original_text, embedding <-> $1 AS similarity FROM embedding_notes WHERE is_deleted = false ORDER BY similarity LIMIT 10",
 		pgvector.NewVector(embeddingValue),
 	)
 	if err != nil {
