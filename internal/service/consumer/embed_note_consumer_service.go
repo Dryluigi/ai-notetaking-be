@@ -89,24 +89,6 @@ func (mq *embedNoteConsumerService) processMessage(ctx context.Context, msg amqp
 		return err
 	}
 
-	req := EmbeddingModelRequest{
-		Model:  mq.embeddingModelName,
-		Prompt: dest.Content,
-	}
-	reqJson, _ := json.Marshal(req)
-	res, err := http.Post(fmt.Sprintf("%s/api/embeddings", mq.embeddingServerBaseUrl), "application/json", bytes.NewBuffer(reqJson))
-	if err != nil {
-		log.Println(err)
-		return err
-	}
-
-	var embeddingResponse EmbeddingModelResponse
-	err = json.NewDecoder(res.Body).Decode(&embeddingResponse)
-	if err != nil {
-		log.Println(err)
-		return err
-	}
-
 	tx, err := mq.db.Begin(ctx)
 	if err != nil {
 		log.Println(err)
@@ -139,6 +121,24 @@ func (mq *embedNoteConsumerService) processMessage(ctx context.Context, msg amqp
 		note.Content,
 		note.CreatedAt.Format(time.RFC3339),
 	)
+	req := EmbeddingModelRequest{
+		Model:  mq.embeddingModelName,
+		Prompt: document,
+	}
+	reqJson, _ := json.Marshal(req)
+	res, err := http.Post(fmt.Sprintf("%s/api/embeddings", mq.embeddingServerBaseUrl), "application/json", bytes.NewBuffer(reqJson))
+	if err != nil {
+		log.Println(err)
+		return err
+	}
+
+	var embeddingResponse EmbeddingModelResponse
+	err = json.NewDecoder(res.Body).Decode(&embeddingResponse)
+	if err != nil {
+		log.Println(err)
+		return err
+	}
+
 	embeddingText := embeddingentity.NoteEmbedding{
 		Id:           uuid.New(),
 		NoteId:       dest.NoteId,

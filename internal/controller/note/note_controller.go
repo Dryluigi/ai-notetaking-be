@@ -4,12 +4,14 @@ import (
 	noteservice "ai-notetaking-be/internal/service/note"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/google/uuid"
 )
 
 type INoteController interface {
 	Create(c *fiber.Ctx) error
 	Search(c *fiber.Ctx) error
 	Ask(c *fiber.Ctx) error
+	Update(c *fiber.Ctx) error
 }
 
 type noteController struct {
@@ -54,6 +56,24 @@ func (nc *noteController) Ask(c *fiber.Ctx) error {
 	}
 
 	res, err := nc.noteService.Ask(c.UserContext(), &request)
+	if err != nil {
+		return err
+	}
+
+	return c.Status(fiber.StatusOK).JSON(res)
+}
+
+func (nc *noteController) Update(c *fiber.Ctx) error {
+	id := c.Params("id")
+	idUuid, _ := uuid.Parse(id)
+
+	var request noteservice.UpdateNoteRequest
+	err := c.BodyParser(&request)
+	if err != nil {
+		return err
+	}
+
+	res, err := nc.noteService.Update(c.UserContext(), idUuid, &request)
 	if err != nil {
 		return err
 	}

@@ -55,6 +55,7 @@ type INoteService interface {
 	Create(ctx context.Context, request *CreateNoteRequest) (*CreateNoteResponse, error)
 	Search(ctx context.Context, request *SearchNoteRequest) ([]*SearchNoteResponse, error)
 	Ask(ctx context.Context, request *AskNoteRequest) (*AskNoteResponse, error)
+	Update(ctx context.Context, id uuid.UUID, request *UpdateNoteRequest) (*UpdateNoteResponse, error)
 }
 
 type noteService struct {
@@ -82,9 +83,7 @@ func (ns *noteService) Create(ctx context.Context, request *CreateNoteRequest) (
 	}
 
 	msg := EmbedCreatedNoteMessage{
-		NoteId:  id,
-		Title:   noteEntity.Title,
-		Content: noteEntity.Content,
+		NoteId: id,
 	}
 	msgJson, err := json.Marshal(msg)
 	if err != nil {
@@ -195,8 +194,6 @@ func (ns *noteService) Ask(ctx context.Context, request *AskNoteRequest) (*AskNo
 		Your answer: ...
 	`, referencesString, request.Question)
 
-	log.Println(prompt)
-
 	chatRequest := ChatRequest{
 		Model: "llama3.2",
 		Messages: []ChatMessage{
@@ -224,6 +221,38 @@ func (ns *noteService) Ask(ctx context.Context, request *AskNoteRequest) (*AskNo
 	return &AskNoteResponse{
 		Answer: answerResponse.Message.Content,
 	}, nil
+}
+
+func (ns *noteService) Update(ctx context.Context, id uuid.UUID, request *UpdateNoteRequest) (*UpdateNoteResponse, error) {
+	n, err := ns.noteRepository.GetById(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	now := time.Now()
+	updatedBy := "System"
+	n.Title = request.Title
+	n.Content = request.Content
+	n.UpdatedAt = &now
+	n.UpdatedBy = &updatedBy
+
+	err = ns.noteRepository.Update(ctx, n)
+	if err != nil {
+		return nil, err
+	}
+
+	msg := EmbedCreatedNoteMessage{
+		NoteId: id,
+	}
+	msgJson, err := json.Marshal(msg)
+	if err != nil {
+		return nil, err
+	}
+	ns.rabbitMqService.Publish(
+		ctx,
+		msgJson,
+	)
+
+	return &UpdateNoteResponse{Id: id}, nil
 }
 
 func NewNoteService(

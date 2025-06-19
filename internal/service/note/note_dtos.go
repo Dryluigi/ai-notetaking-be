@@ -12,6 +12,15 @@ type CreateNoteResponse struct {
 	Id uuid.UUID `json:"id"`
 }
 
+type UpdateNoteRequest struct {
+	Title   string `json:"title"`
+	Content string `json:"content"`
+}
+
+type UpdateNoteResponse struct {
+	Id uuid.UUID `json:"id"`
+}
+
 type SearchNoteRequest struct {
 	Query string `query:"query"`
 }
@@ -30,7 +39,5 @@ type AskNoteResponse struct {
 }
 
 type EmbedCreatedNoteMessage struct {
-	NoteId  uuid.UUID `json:"note_id"`
-	Title   string    `json:"title"`
-	Content string    `json:"content"`
+	NoteId uuid.UUID `json:"note_id"`
 }
