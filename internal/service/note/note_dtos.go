@@ -21,6 +21,14 @@ type UpdateNoteResponse struct {
 	Id uuid.UUID `json:"id"`
 }
 
+type UpdateNoteNotebookRequest struct {
+	NewNotebookId *uuid.UUID `json:"new_notebook_id"`
+}
+
+type UpdateNoteNotebookResponse struct {
+	Id uuid.UUID `json:"id"`
+}
+
 type SearchNoteRequest struct {
 	Query string `query:"query"`
 }

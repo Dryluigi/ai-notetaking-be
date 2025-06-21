@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -17,6 +18,7 @@ type INoteRepository interface {
 	UsingTx(ctx context.Context, tx database.DatabaseQueryer) INoteRepository
 	Create(ctx context.Context, noteEntity *noteentity.Note) error
 	Update(ctx context.Context, noteEntity *noteentity.Note) error
+	UpdateNoteNotebook(ctx context.Context, noteId uuid.UUID, notebookId *uuid.UUID, updatedBy string) error
 	GetById(ctx context.Context, id uuid.UUID) (*noteentity.Note, error)
 	GetByIds(ctx context.Context, ids []uuid.UUID) ([]*noteentity.Note, error)
 }
@@ -151,6 +153,22 @@ func (n *noteRepository) Update(ctx context.Context, noteEntity *noteentity.Note
 		noteEntity.UpdatedAt,
 		noteEntity.UpdatedBy,
 		noteEntity.Id,
+	)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (n *noteRepository) UpdateNoteNotebook(ctx context.Context, noteId uuid.UUID, notebookId *uuid.UUID, updatedBy string) error {
+	_, err := n.db.Exec(
+		ctx,
+		"UPDATE notes SET notebook_id = $1, updated_at = $2, updated_by = $3 WHERE id = $4",
+		notebookId,
+		time.Now(),
+		updatedBy,
+		noteId,
 	)
 	if err != nil {
 		return err

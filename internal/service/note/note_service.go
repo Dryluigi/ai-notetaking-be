@@ -56,6 +56,7 @@ type INoteService interface {
 	Search(ctx context.Context, request *SearchNoteRequest) ([]*SearchNoteResponse, error)
 	Ask(ctx context.Context, request *AskNoteRequest) (*AskNoteResponse, error)
 	Update(ctx context.Context, id uuid.UUID, request *UpdateNoteRequest) (*UpdateNoteResponse, error)
+	UpdateNoteNotebook(ctx context.Context, id uuid.UUID, request *UpdateNoteNotebookRequest) (*UpdateNoteNotebookResponse, error)
 }
 
 type noteService struct {
@@ -254,6 +255,33 @@ func (ns *noteService) Update(ctx context.Context, id uuid.UUID, request *Update
 	)
 
 	return &UpdateNoteResponse{Id: id}, nil
+}
+
+func (ns *noteService) UpdateNoteNotebook(ctx context.Context, id uuid.UUID, request *UpdateNoteNotebookRequest) (*UpdateNoteNotebookResponse, error) {
+	_, err := ns.noteRepository.GetById(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	err = ns.noteRepository.UpdateNoteNotebook(ctx, id, request.NewNotebookId, "System")
+	if err != nil {
+		return nil, err
+	}
+
+	msg := EmbedCreatedNoteMessage{
+		NoteId:             id,
+		DeleteOldEmbedding: true,
+	}
+	msgJson, err := json.Marshal(msg)
+	if err != nil {
+		return nil, err
+	}
+	ns.rabbitMqService.Publish(
+		ctx,
+		msgJson,
+	)
+
+	return &UpdateNoteNotebookResponse{Id: id}, nil
 }
 
 func NewNoteService(
