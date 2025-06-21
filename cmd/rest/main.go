@@ -33,6 +33,7 @@ func main() {
 	)
 	notebookService := noteservice.NewNotebookService(
 		notebookRepository,
+		noteRepository,
 		rabbitMqService,
 	)
 	noteController := notecontroller.NewNoteController(noteService)
