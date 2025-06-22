@@ -35,7 +35,9 @@ func main() {
 	notebookService := noteservice.NewNotebookService(
 		notebookRepository,
 		noteRepository,
+		embeddingRepository,
 		rabbitMqService,
+		db,
 	)
 	noteController := notecontroller.NewNoteController(noteService)
 	notebookController := notecontroller.NewNotebookController(notebookService)

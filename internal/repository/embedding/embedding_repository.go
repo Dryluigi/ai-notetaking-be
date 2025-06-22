@@ -17,6 +17,7 @@ type IEmbeddingRepository interface {
 	FindMostSimilarNoteIds(ctx context.Context, embeddingValue []float32) ([]uuid.UUID, error)
 	DeleteNoteEmbeddings(ctx context.Context, noteId uuid.UUID, deletedBy string) error
 	DeleteByNoteId(ctx context.Context, noteId uuid.UUID, deletedBy string) error
+	DeleteByNotebookId(ctx context.Context, notebookId uuid.UUID, deletedBy string) error
 }
 
 type embeddingRepository struct {
@@ -97,6 +98,21 @@ func (n *embeddingRepository) DeleteByNoteId(ctx context.Context, noteId uuid.UU
 		time.Now(),
 		deletedBy,
 		noteId,
+	)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (n *embeddingRepository) DeleteByNotebookId(ctx context.Context, notebookId uuid.UUID, deletedBy string) error {
+	_, err := n.db.Exec(
+		ctx,
+		"UPDATE embedding_notes SET is_deleted = true, deleted_at = $1, deleted_by = $2 WHERE note_id IN (SELECT id FROM notes WHERE notebook_id = $3)",
+		time.Now(),
+		deletedBy,
+		notebookId,
 	)
 	if err != nil {
 		return err

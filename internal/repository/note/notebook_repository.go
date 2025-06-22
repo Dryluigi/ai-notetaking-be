@@ -2,8 +2,10 @@ package note
 
 import (
 	noteentity "ai-notetaking-be/internal/entity/note"
+	"ai-notetaking-be/pkg/database"
 	"context"
 	"errors"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -11,14 +13,22 @@ import (
 )
 
 type INotebookRepository interface {
+	UsingTx(ctx context.Context, tx database.DatabaseQueryer) INotebookRepository
 	GetById(ctx context.Context, id uuid.UUID) (*noteentity.Notebook, error)
 	Create(ctx context.Context, notebookEntity *noteentity.Notebook) error
 	Update(ctx context.Context, notebookEntity *noteentity.Notebook) error
 	UpdateParent(ctx context.Context, notebookEntity *noteentity.Notebook) error
+	Delete(ctx context.Context, id uuid.UUID, deletedBy string) error
 }
 
 type notebookRepository struct {
-	db *pgxpool.Pool
+	db database.DatabaseQueryer
+}
+
+func (n *notebookRepository) UsingTx(ctx context.Context, tx database.DatabaseQueryer) INotebookRepository {
+	return &notebookRepository{
+		db: tx,
+	}
 }
 
 func (n *notebookRepository) GetById(ctx context.Context, id uuid.UUID) (*noteentity.Notebook, error) {
@@ -87,6 +97,21 @@ func (n *notebookRepository) UpdateParent(ctx context.Context, notebookEntity *n
 		notebookEntity.UpdatedAt,
 		notebookEntity.UpdatedBy,
 		notebookEntity.Id,
+	)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (n *notebookRepository) Delete(ctx context.Context, id uuid.UUID, deletedBy string) error {
+	_, err := n.db.Exec(
+		ctx,
+		"UPDATE notebook SET is_deleted = true, deleted_at = $1, deleted_by = $2 WHERE id = $3",
+		time.Now(),
+		deletedBy,
+		id,
 	)
 	if err != nil {
 		return err

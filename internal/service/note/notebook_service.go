@@ -2,6 +2,7 @@ package note
 
 import (
 	noteentity "ai-notetaking-be/internal/entity/note"
+	embeddingrepository "ai-notetaking-be/internal/repository/embedding"
 	noterepository "ai-notetaking-be/internal/repository/note"
 	publisherservice "ai-notetaking-be/internal/service/publisher"
 	"context"
@@ -9,18 +10,24 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type INotebookService interface {
 	Create(ctx context.Context, request *CreateNotebookRequest) (*CreateNotebookResponse, error)
 	Update(ctx context.Context, id uuid.UUID, request *UpdateNotebookRequest) (*UpdateNotebookResponse, error)
 	UpdateParent(ctx context.Context, id uuid.UUID, request *UpdateNotebookParentRequest) (*UpdateNotebookParentResponse, error)
+	Delete(ctx context.Context, id uuid.UUID) error
 }
 
 type notebookService struct {
-	noteRepository     noterepository.INoteRepository
-	notebookRepository noterepository.INotebookRepository
-	rabbitMqService    publisherservice.IRabbitMqPublisherService
+	noteRepository      noterepository.INoteRepository
+	notebookRepository  noterepository.INotebookRepository
+	embeddingRepository embeddingrepository.IEmbeddingRepository
+	rabbitMqService     publisherservice.IRabbitMqPublisherService
+
+	db *pgxpool.Pool
 }
 
 func (ns *notebookService) Create(ctx context.Context, request *CreateNotebookRequest) (*CreateNotebookResponse, error) {
@@ -101,14 +108,61 @@ func (ns *notebookService) UpdateParent(ctx context.Context, id uuid.UUID, reque
 	return &UpdateNotebookParentResponse{Id: id}, nil
 }
 
+func (ns *notebookService) Delete(ctx context.Context, id uuid.UUID) error {
+	tx, err := ns.db.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if e := recover(); e != nil {
+			tx.Rollback(ctx)
+		}
+
+		if err != nil {
+			tx.Rollback(ctx)
+		}
+	}()
+
+	noteRepo := ns.noteRepository.UsingTx(ctx, tx)
+	notebookRepo := ns.notebookRepository.UsingTx(ctx, tx)
+	embedRepo := ns.embeddingRepository.UsingTx(ctx, tx)
+
+	deletedBy := "System"
+	err = notebookRepo.Delete(ctx, id, deletedBy)
+	if err != nil {
+		return err
+	}
+
+	err = noteRepo.DeleteByNotebookId(ctx, id, deletedBy)
+	if err != nil {
+		return err
+	}
+
+	err = embedRepo.DeleteByNotebookId(ctx, id, deletedBy)
+	if err != nil {
+		return err
+	}
+
+	err = tx.Commit(ctx)
+	if err != nil {
+		return nil
+	}
+
+	return nil
+}
+
 func NewNotebookService(
 	notebookRepository noterepository.INotebookRepository,
 	noteRepository noterepository.INoteRepository,
+	embeddingRepository embeddingrepository.IEmbeddingRepository,
 	rabbitMqService publisherservice.IRabbitMqPublisherService,
+	db *pgxpool.Pool,
 ) INotebookService {
 	return &notebookService{
-		notebookRepository: notebookRepository,
-		noteRepository:     noteRepository,
-		rabbitMqService:    rabbitMqService,
+		notebookRepository:  notebookRepository,
+		noteRepository:      noteRepository,
+		embeddingRepository: embeddingRepository,
+		rabbitMqService:     rabbitMqService,
+		db:                  db,
 	}
 }

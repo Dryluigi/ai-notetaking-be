@@ -23,6 +23,7 @@ type INoteRepository interface {
 	GetByIds(ctx context.Context, ids []uuid.UUID) ([]*noteentity.Note, error)
 	GetByNotebookId(ctx context.Context, notebookId uuid.UUID) ([]*noteentity.Note, error)
 	DeleteNote(ctx context.Context, id uuid.UUID, deletedBy string) error
+	DeleteByNotebookId(ctx context.Context, notebookId uuid.UUID, deletedBy string) error
 }
 
 type noteRepository struct {
@@ -211,6 +212,21 @@ func (n *noteRepository) DeleteNote(ctx context.Context, id uuid.UUID, deletedBy
 		time.Now(),
 		deletedBy,
 		id,
+	)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (n *noteRepository) DeleteByNotebookId(ctx context.Context, notebookId uuid.UUID, deletedBy string) error {
+	_, err := n.db.Exec(
+		ctx,
+		"UPDATE notes SET is_deleted = true, deleted_at = $1, deleted_by = $2 WHERE notebook_id = $3",
+		time.Now(),
+		deletedBy,
+		notebookId,
 	)
 	if err != nil {
 		return err

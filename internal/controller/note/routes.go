@@ -15,4 +15,5 @@ func AssignNoteRoutes(app *fiber.App, noteController INoteController, notebookCo
 	notebookGroup.Post("", notebookController.Create)
 	notebookGroup.Put(":id", notebookController.Update)
 	notebookGroup.Put(":id/update-parent", notebookController.UpdateParent)
+	notebookGroup.Delete(":id", notebookController.Delete)
 }
