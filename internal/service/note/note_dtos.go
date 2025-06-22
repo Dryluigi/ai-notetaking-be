@@ -1,6 +1,10 @@
 package note
 
-import "github.com/google/uuid"
+import (
+	"time"
+
+	"github.com/google/uuid"
+)
 
 type CreateNoteRequest struct {
 	Title      string     `json:"title"`
@@ -44,6 +48,17 @@ type AskNoteRequest struct {
 
 type AskNoteResponse struct {
 	Answer string `json:"answer"`
+}
+
+type ShowNoteResponse struct {
+	Id         uuid.UUID  `json:"id"`
+	Title      string     `json:"title"`
+	Content    string     `json:"content"`
+	NotebookId *uuid.UUID `json:"notebook_id"`
+	CreatedAt  time.Time  `json:"created_at"`
+	CreatedBy  string     `json:"created_by"`
+	UpdatedAt  *time.Time `json:"updated_at"`
+	UpdatedBy  *string    `json:"updated_by"`
 }
 
 type EmbedCreatedNoteMessage struct {

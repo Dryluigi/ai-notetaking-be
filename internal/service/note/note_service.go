@@ -60,6 +60,7 @@ type INoteService interface {
 	Update(ctx context.Context, id uuid.UUID, request *UpdateNoteRequest) (*UpdateNoteResponse, error)
 	UpdateNoteNotebook(ctx context.Context, id uuid.UUID, request *UpdateNoteNotebookRequest) (*UpdateNoteNotebookResponse, error)
 	Delete(ctx context.Context, id uuid.UUID) error
+	Show(ctx context.Context, id uuid.UUID) (*ShowNoteResponse, error)
 }
 
 type noteService struct {
@@ -322,6 +323,25 @@ func (ns *noteService) Delete(ctx context.Context, id uuid.UUID) error {
 	}
 
 	return nil
+}
+
+func (ns *noteService) Show(ctx context.Context, id uuid.UUID) (*ShowNoteResponse, error) {
+	note, err := ns.noteRepository.GetById(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	res := ShowNoteResponse{
+		Id:         note.Id,
+		Title:      note.Title,
+		Content:    note.Content,
+		NotebookId: note.NotebookId,
+		CreatedAt:  note.CreatedAt,
+		CreatedBy:  note.CreatedBy,
+		UpdatedAt:  note.UpdatedAt,
+		UpdatedBy:  note.UpdatedBy,
+	}
+
+	return &res, nil
 }
 
 func NewNoteService(

@@ -65,6 +65,8 @@ func (n *noteRepository) GetById(ctx context.Context, id uuid.UUID) (*noteentity
 				n.notebook_id,
 				n.created_at,
 				n.created_by,
+				n.updated_at,
+				n.updated_by,
 				nb.id,
 				nb.name
 			FROM
@@ -86,6 +88,8 @@ func (n *noteRepository) GetById(ctx context.Context, id uuid.UUID) (*noteentity
 		&noteEntity.NotebookId,
 		&noteEntity.CreatedAt,
 		&noteEntity.CreatedBy,
+		&noteEntity.UpdatedAt,
+		&noteEntity.UpdatedBy,
 		&notebookId,
 		&notebookName,
 	)

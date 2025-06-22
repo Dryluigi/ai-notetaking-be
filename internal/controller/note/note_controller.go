@@ -14,6 +14,7 @@ type INoteController interface {
 	Update(c *fiber.Ctx) error
 	UpdateNotebook(c *fiber.Ctx) error
 	Delete(c *fiber.Ctx) error
+	Show(c *fiber.Ctx) error
 }
 
 type noteController struct {
@@ -111,6 +112,18 @@ func (nc *noteController) Delete(c *fiber.Ctx) error {
 	}
 
 	return c.SendStatus(fiber.StatusOK)
+}
+
+func (nc *noteController) Show(c *fiber.Ctx) error {
+	id := c.Params("id")
+	idUuid, _ := uuid.Parse(id)
+
+	note, err := nc.noteService.Show(c.UserContext(), idUuid)
+	if err != nil {
+		return err
+	}
+
+	return c.Status(fiber.StatusOK).JSON(note)
 }
 
 func NewNoteController(noteService noteservice.INoteService) INoteController {
