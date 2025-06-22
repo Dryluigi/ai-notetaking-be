@@ -14,6 +14,7 @@ import (
 type INotebookService interface {
 	Create(ctx context.Context, request *CreateNotebookRequest) (*CreateNotebookResponse, error)
 	Update(ctx context.Context, id uuid.UUID, request *UpdateNotebookRequest) (*UpdateNotebookResponse, error)
+	UpdateParent(ctx context.Context, id uuid.UUID, request *UpdateNotebookParentRequest) (*UpdateNotebookParentResponse, error)
 }
 
 type notebookService struct {
@@ -79,6 +80,25 @@ func (ns *notebookService) Update(ctx context.Context, id uuid.UUID, request *Up
 	}
 
 	return &UpdateNotebookResponse{Id: id}, nil
+}
+
+func (ns *notebookService) UpdateParent(ctx context.Context, id uuid.UUID, request *UpdateNotebookParentRequest) (*UpdateNotebookParentResponse, error) {
+	notebook, err := ns.notebookRepository.GetById(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	now := time.Now()
+	updatedBy := "System"
+	notebook.ParentId = &request.ParentId
+	notebook.UpdatedAt = &now
+	notebook.UpdatedBy = &updatedBy
+
+	err = ns.notebookRepository.UpdateParent(ctx, notebook)
+	if err != nil {
+		return nil, err
+	}
+
+	return &UpdateNotebookParentResponse{Id: id}, nil
 }
 
 func NewNotebookService(

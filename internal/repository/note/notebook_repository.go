@@ -14,6 +14,7 @@ type INotebookRepository interface {
 	GetById(ctx context.Context, id uuid.UUID) (*noteentity.Notebook, error)
 	Create(ctx context.Context, notebookEntity *noteentity.Notebook) error
 	Update(ctx context.Context, notebookEntity *noteentity.Notebook) error
+	UpdateParent(ctx context.Context, notebookEntity *noteentity.Notebook) error
 }
 
 type notebookRepository struct {
@@ -67,6 +68,22 @@ func (n *notebookRepository) Update(ctx context.Context, notebookEntity *noteent
 		ctx,
 		"UPDATE notebook SET name = $1, updated_at = $2, updated_by = $3 WHERE id = $4",
 		notebookEntity.Name,
+		notebookEntity.UpdatedAt,
+		notebookEntity.UpdatedBy,
+		notebookEntity.Id,
+	)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (n *notebookRepository) UpdateParent(ctx context.Context, notebookEntity *noteentity.Notebook) error {
+	_, err := n.db.Exec(
+		ctx,
+		"UPDATE notebook SET parent_id = $1, updated_at = $2, updated_by = $3 WHERE id = $4",
+		notebookEntity.ParentId,
 		notebookEntity.UpdatedAt,
 		notebookEntity.UpdatedBy,
 		notebookEntity.Id,

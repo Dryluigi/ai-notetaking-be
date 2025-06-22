@@ -18,3 +18,11 @@ type UpdateNotebookRequest struct {
 type UpdateNotebookResponse struct {
 	Id uuid.UUID `json:"id"`
 }
+
+type UpdateNotebookParentRequest struct {
+	ParentId uuid.UUID `json:"parent_id"`
+}
+
+type UpdateNotebookParentResponse struct {
+	Id uuid.UUID `json:"id"`
+}

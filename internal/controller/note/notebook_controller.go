@@ -10,6 +10,7 @@ import (
 type INotebookController interface {
 	Create(c *fiber.Ctx) error
 	Update(c *fiber.Ctx) error
+	UpdateParent(c *fiber.Ctx) error
 }
 
 type notebookController struct {
@@ -41,6 +42,23 @@ func (nc *notebookController) Update(c *fiber.Ctx) error {
 	idUuid := uuid.MustParse(id)
 
 	res, err := nc.notebookService.Update(c.UserContext(), idUuid, &request)
+	if err != nil {
+		return err
+	}
+
+	return c.Status(fiber.StatusCreated).JSON(res)
+}
+
+func (nc *notebookController) UpdateParent(c *fiber.Ctx) error {
+	var request noteservice.UpdateNotebookParentRequest
+	err := c.BodyParser(&request)
+	if err != nil {
+		return err
+	}
+	id := c.Params("id")
+	idUuid := uuid.MustParse(id)
+
+	res, err := nc.notebookService.UpdateParent(c.UserContext(), idUuid, &request)
 	if err != nil {
 		return err
 	}
