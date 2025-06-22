@@ -19,6 +19,7 @@ type INotebookService interface {
 	Update(ctx context.Context, id uuid.UUID, request *UpdateNotebookRequest) (*UpdateNotebookResponse, error)
 	UpdateParent(ctx context.Context, id uuid.UUID, request *UpdateNotebookParentRequest) (*UpdateNotebookParentResponse, error)
 	Delete(ctx context.Context, id uuid.UUID) error
+	Show(ctx context.Context, id uuid.UUID) (*ShowNotebookResponse, error)
 }
 
 type notebookService struct {
@@ -149,6 +150,24 @@ func (ns *notebookService) Delete(ctx context.Context, id uuid.UUID) error {
 	}
 
 	return nil
+}
+
+func (ns *notebookService) Show(ctx context.Context, id uuid.UUID) (*ShowNotebookResponse, error) {
+	notebook, err := ns.notebookRepository.GetById(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	res := ShowNotebookResponse{
+		Id:        notebook.Id,
+		Name:      notebook.Name,
+		ParentId:  notebook.ParentId,
+		CreatedAt: notebook.CreatedAt,
+		CreatedBy: notebook.CreatedBy,
+		UpdatedAt: notebook.UpdatedAt,
+		UpdatedBy: notebook.UpdatedBy,
+	}
+
+	return &res, nil
 }
 
 func NewNotebookService(
