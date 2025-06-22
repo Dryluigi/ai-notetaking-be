@@ -30,6 +30,7 @@ func main() {
 		rabbitMqService,
 		os.Getenv("EMBEDDING_SERVER_BASE_URL"),
 		os.Getenv("EMBEDDING_MODEL_NAME"),
+		db,
 	)
 	notebookService := noteservice.NewNotebookService(
 		notebookRepository,

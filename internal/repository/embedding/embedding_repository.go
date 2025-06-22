@@ -16,6 +16,7 @@ type IEmbeddingRepository interface {
 	CreateNoteEmbedding(ctx context.Context, noteEmbedding *embeddingentity.NoteEmbedding) error
 	FindMostSimilarNoteIds(ctx context.Context, embeddingValue []float32) ([]uuid.UUID, error)
 	DeleteNoteEmbeddings(ctx context.Context, noteId uuid.UUID, deletedBy string) error
+	DeleteByNoteId(ctx context.Context, noteId uuid.UUID, deletedBy string) error
 }
 
 type embeddingRepository struct {
@@ -87,6 +88,21 @@ func (n *embeddingRepository) FindMostSimilarNoteIds(ctx context.Context, embedd
 	}
 
 	return result, nil
+}
+
+func (n *embeddingRepository) DeleteByNoteId(ctx context.Context, noteId uuid.UUID, deletedBy string) error {
+	_, err := n.db.Exec(
+		ctx,
+		"UPDATE embedding_notes SET is_deleted = true, deleted_at = $1, deleted_by = $2 WHERE note_id = $3",
+		time.Now(),
+		deletedBy,
+		noteId,
+	)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func NewEmbeddingRepository(db *pgxpool.Pool) IEmbeddingRepository {

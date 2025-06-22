@@ -15,6 +15,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type EmbeddingModelRequest struct {
@@ -57,6 +59,7 @@ type INoteService interface {
 	Ask(ctx context.Context, request *AskNoteRequest) (*AskNoteResponse, error)
 	Update(ctx context.Context, id uuid.UUID, request *UpdateNoteRequest) (*UpdateNoteResponse, error)
 	UpdateNoteNotebook(ctx context.Context, id uuid.UUID, request *UpdateNoteNotebookRequest) (*UpdateNoteNotebookResponse, error)
+	Delete(ctx context.Context, id uuid.UUID) error
 }
 
 type noteService struct {
@@ -66,6 +69,8 @@ type noteService struct {
 
 	embeddingModelName      string
 	embeddingServiceBaseUrl string
+
+	db *pgxpool.Pool
 }
 
 func (ns *noteService) Create(ctx context.Context, request *CreateNoteRequest) (*CreateNoteResponse, error) {
@@ -284,12 +289,48 @@ func (ns *noteService) UpdateNoteNotebook(ctx context.Context, id uuid.UUID, req
 	return &UpdateNoteNotebookResponse{Id: id}, nil
 }
 
+func (ns *noteService) Delete(ctx context.Context, id uuid.UUID) error {
+	tx, err := ns.db.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if e := recover(); e != nil {
+			tx.Rollback(ctx)
+		}
+
+		if err != nil {
+			tx.Rollback(ctx)
+		}
+	}()
+
+	noteRepo := ns.noteRepository.UsingTx(ctx, tx)
+	embedRepo := ns.embeddingRepository.UsingTx(ctx, tx)
+	err = noteRepo.DeleteNote(ctx, id, "System")
+	if err != nil {
+		return err
+	}
+
+	err = embedRepo.DeleteByNoteId(ctx, id, "System")
+	if err != nil {
+		return err
+	}
+
+	err = tx.Commit(ctx)
+	if err != nil {
+		return nil
+	}
+
+	return nil
+}
+
 func NewNoteService(
 	noteRepository noterepository.INoteRepository,
 	embeddingRepository embeddingrepository.IEmbeddingRepository,
 	rabbitMqService publisherservice.IRabbitMqPublisherService,
 	embeddingServiceBaseUrl string,
 	embeddingModelName string,
+	db *pgxpool.Pool,
 ) INoteService {
 	return &noteService{
 		noteRepository:          noteRepository,
@@ -297,5 +338,6 @@ func NewNoteService(
 		embeddingRepository:     embeddingRepository,
 		embeddingModelName:      embeddingModelName,
 		embeddingServiceBaseUrl: embeddingServiceBaseUrl,
+		db:                      db,
 	}
 }
