@@ -13,6 +13,7 @@ type INotebookController interface {
 	UpdateParent(c *fiber.Ctx) error
 	Delete(c *fiber.Ctx) error
 	Show(c *fiber.Ctx) error
+	GetAll(c *fiber.Ctx) error
 }
 
 type notebookController struct {
@@ -85,6 +86,15 @@ func (nc *notebookController) Show(c *fiber.Ctx) error {
 	idUuid := uuid.MustParse(id)
 
 	res, err := nc.notebookService.Show(c.UserContext(), idUuid)
+	if err != nil {
+		return err
+	}
+
+	return c.Status(fiber.StatusOK).JSON(res)
+}
+
+func (nc *notebookController) GetAll(c *fiber.Ctx) error {
+	res, err := nc.notebookService.GetAll(c.UserContext())
 	if err != nil {
 		return err
 	}

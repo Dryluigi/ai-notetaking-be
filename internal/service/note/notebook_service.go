@@ -20,6 +20,7 @@ type INotebookService interface {
 	UpdateParent(ctx context.Context, id uuid.UUID, request *UpdateNotebookParentRequest) (*UpdateNotebookParentResponse, error)
 	Delete(ctx context.Context, id uuid.UUID) error
 	Show(ctx context.Context, id uuid.UUID) (*ShowNotebookResponse, error)
+	GetAll(ctx context.Context) (*GetAllNotebookResponse, error)
 }
 
 type notebookService struct {
@@ -165,6 +166,70 @@ func (ns *notebookService) Show(ctx context.Context, id uuid.UUID) (*ShowNoteboo
 		CreatedBy: notebook.CreatedBy,
 		UpdatedAt: notebook.UpdatedAt,
 		UpdatedBy: notebook.UpdatedBy,
+	}
+
+	return &res, nil
+}
+
+func (ns *notebookService) GetAll(ctx context.Context) (*GetAllNotebookResponse, error) {
+	notebooks, err := ns.notebookRepository.GetAll(ctx)
+	if err != nil {
+		return nil, err
+	}
+	notes, err := ns.noteRepository.GetAll(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	res := GetAllNotebookResponse{
+		Notebooks: make([]GetAllNotebookResponseNotebook, 0),
+		Notes:     make([]GetAllNotebookResponseNote, 0),
+	}
+
+	notebookIndexMap := make(map[string]int)
+	for i, notebook := range notebooks {
+		res.Notebooks = append(res.Notebooks, GetAllNotebookResponseNotebook{
+			Id:        notebook.Id,
+			Name:      notebook.Name,
+			ParentId:  notebook.ParentId,
+			CreatedAt: notebook.CreatedAt,
+			CreatedBy: notebook.CreatedBy,
+			UpdatedAt: notebook.UpdatedAt,
+			UpdatedBy: notebook.UpdatedBy,
+			Notes:     make([]GetAllNotebookResponseNote, 0),
+		})
+		notebookIndexMap[notebook.Id.String()] = i
+	}
+
+	for _, note := range notes {
+		if note.NotebookId != nil {
+			notebookIndex := notebookIndexMap[note.NotebookId.String()]
+			res.Notebooks[notebookIndex].Notes = append(
+				res.Notebooks[notebookIndex].Notes,
+				GetAllNotebookResponseNote{
+					Id:         note.Id,
+					Title:      note.Title,
+					Content:    note.Content,
+					NotebookId: note.NotebookId,
+					CreatedAt:  note.CreatedAt,
+					CreatedBy:  note.CreatedBy,
+					UpdatedAt:  note.UpdatedAt,
+					UpdatedBy:  note.UpdatedBy,
+				},
+			)
+		}
+		if note.NotebookId == nil {
+			res.Notes = append(res.Notes, GetAllNotebookResponseNote{
+				Id:         note.Id,
+				Title:      note.Title,
+				Content:    note.Content,
+				NotebookId: note.NotebookId,
+				CreatedAt:  note.CreatedAt,
+				CreatedBy:  note.CreatedBy,
+				UpdatedAt:  note.UpdatedAt,
+				UpdatedBy:  note.UpdatedBy,
+			})
+		}
 	}
 
 	return &res, nil

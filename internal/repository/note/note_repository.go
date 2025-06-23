@@ -22,6 +22,7 @@ type INoteRepository interface {
 	GetById(ctx context.Context, id uuid.UUID) (*noteentity.Note, error)
 	GetByIds(ctx context.Context, ids []uuid.UUID) ([]*noteentity.Note, error)
 	GetByNotebookId(ctx context.Context, notebookId uuid.UUID) ([]*noteentity.Note, error)
+	GetAll(ctx context.Context) ([]*noteentity.Note, error)
 	DeleteNote(ctx context.Context, id uuid.UUID, deletedBy string) error
 	DeleteByNotebookId(ctx context.Context, notebookId uuid.UUID, deletedBy string) error
 }
@@ -144,6 +145,51 @@ func (n *noteRepository) GetByIds(ctx context.Context, ids []uuid.UUID) ([]*note
 		if err != nil {
 			return nil, err
 		}
+		result = append(result, &noteEntity)
+	}
+
+	return result, nil
+}
+
+func (n *noteRepository) GetAll(ctx context.Context) ([]*noteentity.Note, error) {
+	rows, err := n.db.Query(
+		ctx,
+		`
+			SELECT
+				n.id,
+				n.title,
+				n.content,
+				n.notebook_id,
+				n.created_at,
+				n.created_by,
+				n.updated_at,
+				n.updated_by
+			FROM
+				notes n
+			WHERE n.is_deleted = false
+		`,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	var result []*noteentity.Note = make([]*noteentity.Note, 0)
+	for rows.Next() {
+		noteEntity := noteentity.Note{}
+		err = rows.Scan(
+			&noteEntity.Id,
+			&noteEntity.Title,
+			&noteEntity.Content,
+			&noteEntity.NotebookId,
+			&noteEntity.CreatedAt,
+			&noteEntity.CreatedBy,
+			&noteEntity.UpdatedAt,
+			&noteEntity.UpdatedBy,
+		)
+		if err != nil {
+			return nil, err
+		}
+
 		result = append(result, &noteEntity)
 	}
 

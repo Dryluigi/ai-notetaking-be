@@ -19,6 +19,7 @@ type INotebookRepository interface {
 	Update(ctx context.Context, notebookEntity *noteentity.Notebook) error
 	UpdateParent(ctx context.Context, notebookEntity *noteentity.Notebook) error
 	Delete(ctx context.Context, id uuid.UUID, deletedBy string) error
+	GetAll(ctx context.Context) ([]*noteentity.Notebook, error)
 }
 
 type notebookRepository struct {
@@ -118,6 +119,41 @@ func (n *notebookRepository) Delete(ctx context.Context, id uuid.UUID, deletedBy
 	}
 
 	return nil
+}
+
+func (n *notebookRepository) GetAll(ctx context.Context) ([]*noteentity.Notebook, error) {
+	rows, err := n.db.Query(
+		ctx,
+		"SELECT id, name, parent_id, created_at, created_by, updated_at, updated_by FROM notebook WHERE is_deleted = false ORDER BY created_at DESC",
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var notebooks []*noteentity.Notebook
+	for rows.Next() {
+		var notebook noteentity.Notebook
+		err := rows.Scan(
+			&notebook.Id,
+			&notebook.Name,
+			&notebook.ParentId,
+			&notebook.CreatedAt,
+			&notebook.CreatedBy,
+			&notebook.UpdatedAt,
+			&notebook.UpdatedBy,
+		)
+		if err != nil {
+			return nil, err
+		}
+		notebooks = append(notebooks, &notebook)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return notebooks, nil
 }
 
 func NewNotebookRepository(db *pgxpool.Pool) INotebookRepository {
