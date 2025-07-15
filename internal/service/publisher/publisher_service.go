@@ -7,7 +7,7 @@ import (
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
-type IRabbitMqPublisherService interface {
+type IPublisherService interface {
 	Publish(ctx context.Context, payload []byte) error
 }
 
@@ -35,7 +35,7 @@ func (mq *rabbitMqPublisherService) Publish(ctx context.Context, payload []byte)
 	return nil
 }
 
-func NewRabbitMqPublisherService(connectionString string, queueName string) IRabbitMqPublisherService {
+func NewRabbitMqPublisherService(connectionString string, queueName string) IPublisherService {
 	conn, err := amqp.Dial(connectionString)
 	if err != nil {
 		panic(fmt.Sprintf("RabbitMQ connection error, %s", err))

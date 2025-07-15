@@ -27,7 +27,7 @@ type notebookService struct {
 	noteRepository      noterepository.INoteRepository
 	notebookRepository  noterepository.INotebookRepository
 	embeddingRepository embeddingrepository.IEmbeddingRepository
-	rabbitMqService     publisherservice.IRabbitMqPublisherService
+	publisherService    publisherservice.IPublisherService
 
 	db *pgxpool.Pool
 }
@@ -79,12 +79,14 @@ func (ns *notebookService) Update(ctx context.Context, id uuid.UUID, request *Up
 		if err != nil {
 			return nil, err
 		}
-		err = ns.rabbitMqService.Publish(
-			ctx,
-			msgJson,
-		)
-		if err != nil {
-			return nil, err
+		if ns.publisherService != nil {
+			err = ns.publisherService.Publish(
+				ctx,
+				msgJson,
+			)
+			if err != nil {
+				return nil, err
+			}
 		}
 	}
 
@@ -239,14 +241,14 @@ func NewNotebookService(
 	notebookRepository noterepository.INotebookRepository,
 	noteRepository noterepository.INoteRepository,
 	embeddingRepository embeddingrepository.IEmbeddingRepository,
-	rabbitMqService publisherservice.IRabbitMqPublisherService,
+	publisherService publisherservice.IPublisherService,
 	db *pgxpool.Pool,
 ) INotebookService {
 	return &notebookService{
 		notebookRepository:  notebookRepository,
 		noteRepository:      noteRepository,
 		embeddingRepository: embeddingRepository,
-		rabbitMqService:     rabbitMqService,
+		publisherService:    publisherService,
 		db:                  db,
 	}
 }

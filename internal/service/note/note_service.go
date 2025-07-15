@@ -66,7 +66,7 @@ type INoteService interface {
 type noteService struct {
 	noteRepository      noterepository.INoteRepository
 	embeddingRepository embeddingrepository.IEmbeddingRepository
-	rabbitMqService     publisherservice.IRabbitMqPublisherService
+	publisherService    publisherservice.IPublisherService
 
 	embeddingModelName      string
 	embeddingServiceBaseUrl string
@@ -96,7 +96,8 @@ func (ns *noteService) Create(ctx context.Context, request *CreateNoteRequest) (
 	if err != nil {
 		return nil, err
 	}
-	ns.rabbitMqService.Publish(
+
+	ns.publisherService.Publish(
 		ctx,
 		msgJson,
 	)
@@ -255,7 +256,8 @@ func (ns *noteService) Update(ctx context.Context, id uuid.UUID, request *Update
 	if err != nil {
 		return nil, err
 	}
-	ns.rabbitMqService.Publish(
+
+	ns.publisherService.Publish(
 		ctx,
 		msgJson,
 	)
@@ -282,7 +284,7 @@ func (ns *noteService) UpdateNoteNotebook(ctx context.Context, id uuid.UUID, req
 	if err != nil {
 		return nil, err
 	}
-	ns.rabbitMqService.Publish(
+	ns.publisherService.Publish(
 		ctx,
 		msgJson,
 	)
@@ -347,14 +349,14 @@ func (ns *noteService) Show(ctx context.Context, id uuid.UUID) (*ShowNoteRespons
 func NewNoteService(
 	noteRepository noterepository.INoteRepository,
 	embeddingRepository embeddingrepository.IEmbeddingRepository,
-	rabbitMqService publisherservice.IRabbitMqPublisherService,
+	publisherService publisherservice.IPublisherService,
 	embeddingServiceBaseUrl string,
 	embeddingModelName string,
 	db *pgxpool.Pool,
 ) INoteService {
 	return &noteService{
 		noteRepository:          noteRepository,
-		rabbitMqService:         rabbitMqService,
+		publisherService:        publisherService,
 		embeddingRepository:     embeddingRepository,
 		embeddingModelName:      embeddingModelName,
 		embeddingServiceBaseUrl: embeddingServiceBaseUrl,
